@@ -641,7 +641,7 @@ revm-optimism = { git = "https://github.com/bluealloy/revm", rev = "a8a9893b" }
 
 revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors", rev = "8900c2b" }
 
-# alloy-consensus = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
+alloy-consensus = { path = "../alloy/crates/consensus" }
 # alloy-contract = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
 # alloy-eips = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
 # alloy-genesis = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
