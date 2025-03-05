@@ -642,6 +642,14 @@ revm-optimism = { git = "https://github.com/bluealloy/revm", rev = "a8a9893b" }
 revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors", rev = "8900c2b" }
 
 alloy-consensus = { path = "../alloy/crates/consensus" }
+alloy-eips = { path = "../alloy/crates/eips" }
+alloy-network-primitives = { path = "../alloy/crates/network-primitives" }
+alloy-network = { path = "../alloy/crates/network" }
+alloy-signer-local = { path = "../alloy/crates/signer-local" }
+alloy-rpc-types-eth = { path = "../alloy/crates/rpc-types-eth" }
+alloy-serde = { path = "../alloy/crates/serde" }
+alloy-signer = { path = "../alloy/crates/signer" }
+
 # alloy-contract = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
 # alloy-eips = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
 # alloy-genesis = { git = "https://github.com/alloy-rs/alloy", rev = "cfb13aa" }
