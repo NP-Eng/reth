@@ -102,6 +102,9 @@ pub enum Transaction {
     /// EOA for a single transaction. This allows for temporarily adding smart contract
     /// functionality to the EOA.
     Eip7702(TxEip7702),
+    // NP TODO
+    /// TODO!
+    Eip4844Extended(TxEip4844),
 }
 
 impl Transaction {
