@@ -80,6 +80,7 @@ impl InMemorySize for PooledTransaction {
             Self::Eip1559(tx) => tx.size(),
             Self::Eip4844(tx) => tx.size(),
             Self::Eip7702(tx) => tx.size(),
+            Self::LegacyExtended(tx) => tx.size(),
         }
     }
 }

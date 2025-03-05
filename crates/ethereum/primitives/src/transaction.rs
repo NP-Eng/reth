@@ -33,6 +33,7 @@ macro_rules! delegate {
             Transaction::Eip1559($tx) => $tx.$method($($arg),*),
             Transaction::Eip4844($tx) => $tx.$method($($arg),*),
             Transaction::Eip7702($tx) => $tx.$method($($arg),*),
+            Transaction::LegacyExtended($tx) => $tx.$method($($arg),*),
         }
     };
 }
@@ -104,7 +105,9 @@ pub enum Transaction {
     Eip7702(TxEip7702),
     // NP TODO
     /// TODO!
-    Eip4844Extended(TxEip4844),
+    // NP TODO
+    #[from(skip)]
+    LegacyExtended(TxLegacy),
 }
 
 impl Transaction {
@@ -116,6 +119,7 @@ impl Transaction {
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
             Self::Eip7702(_) => TxType::Eip7702,
+            Self::LegacyExtended(_) => TxType::Legacy,
         }
     }
 
@@ -127,6 +131,7 @@ impl Transaction {
             Self::Eip1559(tx) => tx.nonce = nonce,
             Self::Eip4844(tx) => tx.nonce = nonce,
             Self::Eip7702(tx) => tx.nonce = nonce,
+            Self::LegacyExtended(tx) => tx.nonce = nonce,
         }
     }
 }
@@ -277,6 +282,10 @@ impl reth_codecs::Compact for Transaction {
                 let (tx, buf) = TxEip7702::from_compact(buf, buf.len());
                 (Self::Eip7702(tx), buf)
             }
+            TxType::LegacyExtended => {
+                let (tx, buf) = TxLegacy::from_compact(buf, buf.len());
+                (Self::LegacyExtended(tx), buf)
+            }
         }
     }
 }
@@ -289,6 +298,7 @@ impl From<TypedTransaction> for Transaction {
             TypedTransaction::Eip1559(tx) => Self::Eip1559(tx),
             TypedTransaction::Eip4844(tx) => Self::Eip4844(tx.into()),
             TypedTransaction::Eip7702(tx) => Self::Eip7702(tx),
+            TypedTransaction::LegacyExtended(tx) => Self::LegacyExtended(tx),
         }
     }
 }
@@ -544,6 +554,7 @@ impl From<TxEnvelope> for TransactionSigned {
             TxEnvelope::Eip1559(tx) => tx.into(),
             TxEnvelope::Eip4844(tx) => tx.into(),
             TxEnvelope::Eip7702(tx) => tx.into(),
+            TxEnvelope::LegacyExtended(tx) => tx.into(),
         }
     }
 }
@@ -557,6 +568,7 @@ impl From<TransactionSigned> for TxEnvelope {
             Transaction::Eip1559(tx) => Signed::new_unchecked(tx, signature, hash).into(),
             Transaction::Eip4844(tx) => Signed::new_unchecked(tx, signature, hash).into(),
             Transaction::Eip7702(tx) => Signed::new_unchecked(tx, signature, hash).into(),
+            Transaction::LegacyExtended(tx) => Signed::new_unchecked(tx, signature, hash).into(),
         }
     }
 }
@@ -643,6 +655,14 @@ impl Decodable2718 for TransactionSigned {
                 let (tx, signature) = TxEip7702::rlp_decode_with_signature(buf)?;
                 Ok(Self {
                     transaction: Transaction::Eip7702(tx),
+                    signature,
+                    hash: Default::default(),
+                })
+            }
+            TxType::LegacyExtended => {
+                let (tx, signature) = TxLegacy::rlp_decode_with_signature(buf)?;
+                Ok(Self {
+                    transaction: Transaction::LegacyExtended(tx),
                     signature,
                     hash: Default::default(),
                 })
@@ -837,6 +857,25 @@ impl FromRecoveredTx<TransactionSigned> for TxEnv {
                 tx_type: 4,
                 caller: sender,
             },
+
+            // NP TODO What's the tx_type for this?
+            // NP TODO What's the kind for this?
+            Transaction::LegacyExtended(tx) => Self {
+                gas_limit: tx.gas_limit,
+                gas_price: tx.gas_price,
+                gas_priority_fee: None,
+                kind: tx.to,
+                value: tx.value,
+                data: tx.input.clone(),
+                chain_id: tx.chain_id,
+                nonce: tx.nonce,
+                access_list: Default::default(),
+                blob_hashes: Default::default(),
+                max_fee_per_blob_gas: Default::default(),
+                authorization_list: Default::default(),
+                tx_type: 5,
+                caller: sender,
+            },
         }
     }
 }
@@ -887,6 +926,9 @@ impl TryFrom<TransactionSigned> for PooledTransaction {
             TransactionSigned { transaction: Transaction::Eip4844(_), .. } => {
                 Err(TransactionConversionError::UnsupportedForP2P)
             }
+            TransactionSigned {
+                transaction: Transaction::LegacyExtended(tx), signature, ..
+            } => Ok(Self::LegacyExtended(Signed::new_unchecked(tx, signature, hash))),
         }
     }
 }
@@ -902,6 +944,7 @@ impl From<PooledTransaction> for TransactionSigned {
                 let (tx, signature, hash) = tx.into_parts();
                 Signed::new_unchecked(tx.tx, signature, hash).into()
             }
+            PooledTransaction::LegacyExtended(tx) => tx.into(),
         }
     }
 }
@@ -927,6 +970,7 @@ pub mod serde_bincode_compat {
         Eip1559(TxEip1559<'a>),
         Eip4844(Cow<'a, TxEip4844>),
         Eip7702(TxEip7702<'a>),
+        LegacyExtended(TxLegacy<'a>),
     }
 
     impl<'a> From<&'a super::Transaction> for Transaction<'a> {
@@ -937,6 +981,7 @@ pub mod serde_bincode_compat {
                 super::Transaction::Eip1559(tx) => Self::Eip1559(TxEip1559::from(tx)),
                 super::Transaction::Eip4844(tx) => Self::Eip4844(Cow::Borrowed(tx)),
                 super::Transaction::Eip7702(tx) => Self::Eip7702(TxEip7702::from(tx)),
+                super::Transaction::LegacyExtended(tx) => Self::LegacyExtended(TxLegacy::from(tx)),
             }
         }
     }
@@ -949,6 +994,7 @@ pub mod serde_bincode_compat {
                 Transaction::Eip1559(tx) => Self::Eip1559(tx.into()),
                 Transaction::Eip4844(tx) => Self::Eip4844(tx.into_owned()),
                 Transaction::Eip7702(tx) => Self::Eip7702(tx.into()),
+                Transaction::LegacyExtended(tx) => Self::LegacyExtended(tx.into()),
             }
         }
     }

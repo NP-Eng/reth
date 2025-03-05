@@ -88,6 +88,7 @@ where
                 TxEip4844Variant::TxEip4844WithSidecar(tx) => &mut tx.tx.input,
             },
             TxEnvelope::Eip7702(tx) => &mut tx.tx_mut().input,
+            TxEnvelope::LegacyExtended(tx) => &mut tx.tx_mut().input,
         };
         *input = input.slice(..4);
     }

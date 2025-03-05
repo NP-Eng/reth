@@ -144,6 +144,7 @@ impl SignedTransaction for PooledTransaction {
             Self::Eip1559(tx) => tx.hash(),
             Self::Eip7702(tx) => tx.hash(),
             Self::Eip4844(tx) => tx.hash(),
+            Self::LegacyExtended(tx) => tx.hash(),
         }
     }
 
@@ -154,6 +155,7 @@ impl SignedTransaction for PooledTransaction {
             Self::Eip1559(tx) => tx.signature(),
             Self::Eip7702(tx) => tx.signature(),
             Self::Eip4844(tx) => tx.signature(),
+            Self::LegacyExtended(tx) => tx.signature(),
         }
     }
 
@@ -172,6 +174,7 @@ impl SignedTransaction for PooledTransaction {
             Self::Eip1559(tx) => tx.tx().encode_for_signing(buf),
             Self::Eip7702(tx) => tx.tx().encode_for_signing(buf),
             Self::Eip4844(tx) => tx.tx().encode_for_signing(buf),
+            Self::LegacyExtended(tx) => tx.tx().encode_for_signing(buf),
         }
         let signature_hash = keccak256(buf);
         recover_signer_unchecked(self.signature(), signature_hash)
