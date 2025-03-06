@@ -1,9 +1,9 @@
 use alloc::vec::Vec;
-pub use alloy_consensus::{transaction::PooledTransaction, TxType};
+pub use alloy_consensus::{Transaction as AlloyTransaction, transaction::PooledTransaction, TxType};
 use alloy_consensus::{
     transaction::RlpEcdsaTx, BlobTransactionSidecar, SignableTransaction, Signed, TxEip1559,
     TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope, TxLegacy,
-    Typed2718, TypedTransaction,
+    TxExtended, Typed2718, TypedTransaction,
 };
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
@@ -33,7 +33,7 @@ macro_rules! delegate {
             Transaction::Eip1559($tx) => $tx.$method($($arg),*),
             Transaction::Eip4844($tx) => $tx.$method($($arg),*),
             Transaction::Eip7702($tx) => $tx.$method($($arg),*),
-            Transaction::LegacyExtended($tx) => $tx.$method($($arg),*),
+            Transaction::Extended($tx) => $tx.$method($($arg),*),
         }
     };
 }
@@ -104,10 +104,8 @@ pub enum Transaction {
     /// functionality to the EOA.
     Eip7702(TxEip7702),
     // NP TODO
-    /// TODO!
-    // NP TODO
-    #[from(skip)]
-    LegacyExtended(TxLegacy),
+    /// NP TODO!
+    Extended(TxExtended),
 }
 
 impl Transaction {
@@ -119,7 +117,7 @@ impl Transaction {
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
             Self::Eip7702(_) => TxType::Eip7702,
-            Self::LegacyExtended(_) => TxType::Legacy,
+            Self::Extended(_) => TxType::Legacy,
         }
     }
 
@@ -131,7 +129,7 @@ impl Transaction {
             Self::Eip1559(tx) => tx.nonce = nonce,
             Self::Eip4844(tx) => tx.nonce = nonce,
             Self::Eip7702(tx) => tx.nonce = nonce,
-            Self::LegacyExtended(tx) => tx.nonce = nonce,
+            Self::Extended(tx) => tx.nonce = nonce,
         }
     }
 }
@@ -282,9 +280,9 @@ impl reth_codecs::Compact for Transaction {
                 let (tx, buf) = TxEip7702::from_compact(buf, buf.len());
                 (Self::Eip7702(tx), buf)
             }
-            TxType::LegacyExtended => {
-                let (tx, buf) = TxLegacy::from_compact(buf, buf.len());
-                (Self::LegacyExtended(tx), buf)
+            TxType::Extended => {
+                let (tx, buf) = TxExtended::from_compact(buf, buf.len());
+                (Self::Extended(tx), buf)
             }
         }
     }
@@ -298,7 +296,7 @@ impl From<TypedTransaction> for Transaction {
             TypedTransaction::Eip1559(tx) => Self::Eip1559(tx),
             TypedTransaction::Eip4844(tx) => Self::Eip4844(tx.into()),
             TypedTransaction::Eip7702(tx) => Self::Eip7702(tx),
-            TypedTransaction::LegacyExtended(tx) => Self::LegacyExtended(tx),
+            TypedTransaction::Extended(tx) => Self::Extended(tx),
         }
     }
 }
@@ -512,7 +510,7 @@ impl alloy_consensus::Transaction for TransactionSigned {
     }
 }
 
-impl_from_signed!(TxLegacy, TxEip2930, TxEip1559, TxEip7702, TxEip4844, TypedTransaction);
+impl_from_signed!(TxLegacy, TxEip2930, TxEip1559, TxEip7702, TxEip4844, TxExtended, TypedTransaction);
 
 impl From<Signed<Transaction>> for TransactionSigned {
     fn from(value: Signed<Transaction>) -> Self {
@@ -554,7 +552,7 @@ impl From<TxEnvelope> for TransactionSigned {
             TxEnvelope::Eip1559(tx) => tx.into(),
             TxEnvelope::Eip4844(tx) => tx.into(),
             TxEnvelope::Eip7702(tx) => tx.into(),
-            TxEnvelope::LegacyExtended(tx) => tx.into(),
+            TxEnvelope::Extended(tx) => tx.into(),
         }
     }
 }
@@ -568,7 +566,7 @@ impl From<TransactionSigned> for TxEnvelope {
             Transaction::Eip1559(tx) => Signed::new_unchecked(tx, signature, hash).into(),
             Transaction::Eip4844(tx) => Signed::new_unchecked(tx, signature, hash).into(),
             Transaction::Eip7702(tx) => Signed::new_unchecked(tx, signature, hash).into(),
-            Transaction::LegacyExtended(tx) => Signed::new_unchecked(tx, signature, hash).into(),
+            Transaction::Extended(tx) => Signed::new_unchecked(tx, signature, hash).into(),
         }
     }
 }
@@ -659,10 +657,10 @@ impl Decodable2718 for TransactionSigned {
                     hash: Default::default(),
                 })
             }
-            TxType::LegacyExtended => {
-                let (tx, signature) = TxLegacy::rlp_decode_with_signature(buf)?;
+            TxType::Extended => {
+                let (tx, signature) = TxExtended::rlp_decode_with_signature(buf)?;
                 Ok(Self {
-                    transaction: Transaction::LegacyExtended(tx),
+                    transaction: Transaction::Extended(tx),
                     signature,
                     hash: Default::default(),
                 })
@@ -794,7 +792,7 @@ impl FromRecoveredTx<TransactionSigned> for TxEnv {
                 caller: sender,
             },
             Transaction::Eip2930(tx) => Self {
-                gas_limit: tx.gas_limit,
+                gas_limit: tx.gas_limit(),
                 gas_price: tx.gas_price,
                 gas_priority_fee: None,
                 kind: tx.to,
@@ -860,13 +858,14 @@ impl FromRecoveredTx<TransactionSigned> for TxEnv {
 
             // NP TODO What's the tx_type for this?
             // NP TODO What's the kind for this?
-            Transaction::LegacyExtended(tx) => Self {
-                gas_limit: tx.gas_limit,
+            Transaction::Extended(tx) => Self {
+                gas_limit: tx.gas_limit(),
                 gas_price: tx.gas_price,
                 gas_priority_fee: None,
-                kind: tx.to,
+                // NP TODO rename
+                kind: TxKind::Create,
                 value: tx.value,
-                data: tx.input.clone(),
+                data: tx.input().clone(),
                 chain_id: tx.chain_id,
                 nonce: tx.nonce,
                 access_list: Default::default(),
@@ -927,8 +926,8 @@ impl TryFrom<TransactionSigned> for PooledTransaction {
                 Err(TransactionConversionError::UnsupportedForP2P)
             }
             TransactionSigned {
-                transaction: Transaction::LegacyExtended(tx), signature, ..
-            } => Ok(Self::LegacyExtended(Signed::new_unchecked(tx, signature, hash))),
+                transaction: Transaction::Extended(tx), signature, ..
+            } => Ok(Self::Extended(Signed::new_unchecked(tx, signature, hash))),
         }
     }
 }
@@ -944,7 +943,7 @@ impl From<PooledTransaction> for TransactionSigned {
                 let (tx, signature, hash) = tx.into_parts();
                 Signed::new_unchecked(tx.tx, signature, hash).into()
             }
-            PooledTransaction::LegacyExtended(tx) => tx.into(),
+            PooledTransaction::Extended(tx) => tx.into(),
         }
     }
 }
@@ -954,7 +953,7 @@ impl From<PooledTransaction> for TransactionSigned {
 pub mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_consensus::{
-        transaction::serde_bincode_compat::{TxEip1559, TxEip2930, TxEip7702, TxLegacy},
+        transaction::serde_bincode_compat::{TxEip1559, TxEip2930, TxEip7702, TxLegacy, TxExtended},
         TxEip4844,
     };
     use alloy_primitives::{PrimitiveSignature as Signature, TxHash};
@@ -970,7 +969,7 @@ pub mod serde_bincode_compat {
         Eip1559(TxEip1559<'a>),
         Eip4844(Cow<'a, TxEip4844>),
         Eip7702(TxEip7702<'a>),
-        LegacyExtended(TxLegacy<'a>),
+        Extended(TxExtended),
     }
 
     impl<'a> From<&'a super::Transaction> for Transaction<'a> {
@@ -981,7 +980,7 @@ pub mod serde_bincode_compat {
                 super::Transaction::Eip1559(tx) => Self::Eip1559(TxEip1559::from(tx)),
                 super::Transaction::Eip4844(tx) => Self::Eip4844(Cow::Borrowed(tx)),
                 super::Transaction::Eip7702(tx) => Self::Eip7702(TxEip7702::from(tx)),
-                super::Transaction::LegacyExtended(tx) => Self::LegacyExtended(TxLegacy::from(tx)),
+                super::Transaction::Extended(tx) => Self::Extended(TxExtended::from(tx)),
             }
         }
     }
@@ -994,7 +993,7 @@ pub mod serde_bincode_compat {
                 Transaction::Eip1559(tx) => Self::Eip1559(tx.into()),
                 Transaction::Eip4844(tx) => Self::Eip4844(tx.into_owned()),
                 Transaction::Eip7702(tx) => Self::Eip7702(tx.into()),
-                Transaction::LegacyExtended(tx) => Self::LegacyExtended(tx.into()),
+                Transaction::Extended(tx) => Self::Extended(tx.into()),
             }
         }
     }

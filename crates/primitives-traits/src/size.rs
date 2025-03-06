@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use alloy_consensus::{
     transaction::PooledTransaction, Header, TxEip1559, TxEip2930, TxEip4844, TxEip4844WithSidecar,
-    TxEip7702, TxLegacy, TxType,
+    TxEip7702, TxLegacy, TxType, TxExtended,
 };
 use alloy_eips::eip4895::Withdrawals;
 use alloy_primitives::{PrimitiveSignature as Signature, TxHash};
@@ -57,7 +57,8 @@ impl_in_mem_size!(
     TxEip1559,
     TxEip7702,
     TxEip4844,
-    TxEip4844WithSidecar
+    TxEip4844WithSidecar,
+    TxExtended
 );
 
 #[cfg(feature = "op")]
@@ -80,7 +81,7 @@ impl InMemorySize for PooledTransaction {
             Self::Eip1559(tx) => tx.size(),
             Self::Eip4844(tx) => tx.size(),
             Self::Eip7702(tx) => tx.size(),
-            Self::LegacyExtended(tx) => tx.size(),
+            Self::Extended(tx) => tx.size(),
         }
     }
 }

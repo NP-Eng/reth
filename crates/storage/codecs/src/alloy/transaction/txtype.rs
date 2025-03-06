@@ -28,7 +28,7 @@ impl crate::Compact for TxType {
                 buf.put_u8(EIP7702_TX_TYPE_ID);
                 COMPACT_EXTENDED_IDENTIFIER_FLAG
             }
-            Self::LegacyExtended => COMPACT_IDENTIFIER_LEGACY_EXTENDED,
+            Self::Extended => COMPACT_IDENTIFIER_LEGACY_EXTENDED,
         }
     }
 
